@@ -146,7 +146,7 @@ sub_pre_x_targ_correlation(hous_cols)
   
 
 # Pre-processing and feature engineering
-blueprint <- recipe(ViolentCrimesPerPop ~ ., data = communities_data) %>%
+blueprint <- recipe(violentPerPop ~ ., data = communities_data) %>%
   step_string2factor(all_nominal_predictors()) %>%
   step_nzv(all_predictors()) %>%
   step_impute_knn(all_predictors()) %>%
