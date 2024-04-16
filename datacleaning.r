@@ -122,7 +122,7 @@ sub_pre_x_targ_correlation <- function(subcategory){
   for(col in subcategory){
     if(is.numeric(communities_data[[col]])){
       cur_cor <- cor(communities_data[[col]], as.numeric(communities_data$violentPerPop))
-      cur_avg <- cur_avg + cur_cor
+      cur_avg <- cur_avg + abs(cur_cor)
       div <- div + 1
     }
     else{
