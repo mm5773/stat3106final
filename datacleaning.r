@@ -145,15 +145,24 @@ sub_pre_x_targ_correlation(img_cols)
 sub_pre_x_targ_correlation(hous_cols)
   
 
+#drop all rows that are non-predictive 
+communities_data <- communities_data[, !colnames(communities_data) %in% c("communityname", "State", "countyCode", "communityCode")]
+
+#creating training and testing sets 
+set.seed(1)
+indices <- sample(1:nrow(communities_data), size = nrow(communities_data) * 0.75)
+train <- communities_data[indices, ]
+test <- communities_data[-indices, ]
+
 # Pre-processing and feature engineering
-blueprint <- recipe(violentPerPop ~ ., data = communities_data) %>%
+blueprint <- recipe(violentPerPop ~ ., data = train) %>%
   step_string2factor(all_nominal_predictors()) %>%
   step_nzv(all_predictors()) %>%
   step_impute_knn(all_predictors()) %>%
   step_center(all_numeric_predictors()) %>%
-  step_scale(all_numeric_predictors()) %>%
-  step_dummy(all_nominal_predictors())
+  step_scale(all_numeric_predictors()) %>% #do we need to scale 
+  step_dummy(all_nominal_predictors()) %>%
+  prep()
 
-prepared_data <- prep(blueprint, training = communities_data)
-processed_data <- bake(prepared_data, new_data = NULL)
-
+communities_train <- bake(blueprint, new_data = train)
+communities_test <- bake(blueprint, new_data = test)
