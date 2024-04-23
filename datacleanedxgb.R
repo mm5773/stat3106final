@@ -180,25 +180,13 @@ xg_final <- train(violentPerPop ~ .,
                                          subsample = 0.7, 
                                          gamma = 0,
                                          colsample_bytree = 1),
-                   metric = "ROC",
+                   metric = "RMSE",
                    importance = TRUE)
 
-# Training set results
+XGB_pred_train <- predict(xg_final, newdata = communities_train)
+XGB_train_results <- confusionMatrix(communities_train, XGB_pred_train)
+# cat("RMSE:", XGB_train_results[1], "\nMAE:", XGB_train_results[2], "\n")
 
-XGB_pred_train <- predict(XGB_final, newdata = cca_train)
-XGB_train_results <- confusionMatrix(cca_train$V16, XGB_pred_train)
-print(XGB_train_results)
-
-# Test set results
-
-XGB_pred_test <- predict(XGB_final, newdata = cca_test)
-XGB_test_results <- confusionMatrix(cca_test$V16, XGB_pred_test)
-print(XGB_test_results)
-
-# Evaluation metrics
-
-XGB_Accuracy <- XGB_train_results$overall["Accuracy"]
-print(XGB_Accuracy)
-
-XGB_Kappa <- XGB_train_results$overall["Kappa"]
-print(XGB_Kappa)
+XGB_pred_test <- predict(xg_final, newdata = communities_test)
+XGB_test_results <- confusionMatrix(communities_test, XGB_pred_test)
+# cat("RMSE:", XGB_test_results[1], "\nMAE:", XGB_test_results[2], "\n")
