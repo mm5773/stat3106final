@@ -79,7 +79,6 @@ pred_x_targ_correlation <-function(data){
   }
 }
 
-
 pred_x_targ_correlation(communities_data)
 
 #calculate average correlation measure for subcategories
