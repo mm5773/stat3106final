@@ -45,7 +45,7 @@ pol_cols <- c('numPolice', 'policePerPop', 'policeField', 'policeFieldPerPop', '
 communities_data[communities_data == "?"] <- NA
 sum(is.na(communities_data))
 colSums(is.na(communities_data))
-#drop columns with 1675 missing values
+#drop columns with 1872 missing values
 drop_mv_cols <- function(data, threshold){
   missing_cols <- colSums(is.na(data))
   cols_to_drop <- names(missing_cols[missing_cols >= threshold])
@@ -53,7 +53,8 @@ drop_mv_cols <- function(data, threshold){
   
   return(data)
 }
-communities_data <- drop_mv_cols(communities_data, threshold=1675)
+communities_data <- drop_mv_cols(communities_data, threshold=1872)
+
 #drop rows with NA for target variable 
 communities_data <- communities_data[complete.cases(communities_data$violentPerPop), ]
 
@@ -148,6 +149,14 @@ sub_pre_x_targ_correlation(hous_cols)
 #drop all rows that are non-predictive 
 communities_data <- communities_data[, !colnames(communities_data) %in% c("communityname", "State", "countyCode", "communityCode")]
 
+#drop all extraneous target variables 
+communities_data <- communities_data[, !colnames(communities_data) %in% c("rapes", "rapesPerPop", "robberies", "robbbPerPop", "assaults", "assaultPerPop", "burglaries", "burglPerPop", "larcenies", "larcPerPop", "autoTheft", "autoTheft", "autoTheftPerPop", "arsons", "arsonsPerPop", "nonViolPerPop")]
+
+#make sure all rows are numeric
+communities_data$violentPerPop <- as.numeric(communities_data$violentPerPop)
+communities_data$otherPerCap <- as.numeric(communities_data$otherPerCap)
+
+
 #creating training and testing sets 
 set.seed(1)
 indices <- sample(1:nrow(communities_data), size = nrow(communities_data) * 0.75)
@@ -160,7 +169,7 @@ blueprint <- recipe(violentPerPop ~ ., data = train) %>%
   step_nzv(all_predictors()) %>%
   step_impute_knn(all_predictors()) %>%
   step_center(all_numeric_predictors()) %>%
-  step_scale(all_numeric_predictors()) %>% #do we need to scale 
+  step_scale(all_numeric_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>%
   prep()
 
