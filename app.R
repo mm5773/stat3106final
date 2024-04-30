@@ -93,7 +93,7 @@ ui <- fluidPage(
                    radioButtons("color", "Color of bins:",
                                 choices = list("Blue" = "blue", "Red" = "red", "Green" = "green"),
                                 selected = "blue"),
-                   actionButton("click", "Submit")
+                   #actionButton("click", "Submit")
                  )
                ),
                mainPanel(
@@ -121,8 +121,22 @@ ui <- fluidPage(
                              ticks = TRUE,         # Shows tick marks
                              animate = TRUE),
                  conditionalPanel(
-                   condition = "input.kernelType !== 'svmLinear'",
-                   numericInput("gamma", "Gamma", value = 0.1, min = 0.01, max = 10, step = 0.01)
+                   condition = "input.kernelType == 'svmPoly'",
+                   sliderInput("degree", "degree",
+                               min = 1, max = 4, 
+                               value = c(1, 4),  # Default range selected
+                               step = 1,           # Increment step size
+                               ticks = TRUE,         # Shows tick marks
+                               animate = TRUE),
+                 ),
+                 conditionalPanel(
+                   condition = "input.kernelType == 'svmRadial'",
+                   sliderInput("sigma", "sigma",
+                               min = 0.01, max = 1.0, 
+                               value = c(0.01, 0.9),  # Default range selected
+                               step = 0.1,           # Increment step size
+                               ticks = TRUE,         # Shows tick marks
+                               animate = TRUE)
                  ),
                  actionButton("goButton", "Run Model")
                ),
@@ -137,7 +151,32 @@ ui <- fluidPage(
                  )
                )
              )
-        )
+        ),
+    tabPanel("Developing Final Model",
+             titlePanel("Creating Final Model"),
+             sidebarLayout(
+               sidebarPanel(
+                 selectInput("kernelType", "Kernel Type", choices = c("Linear" = "svmLinear", "Polynomial" = "svmPoly", "RBF" = "svmRadial")),
+                 numericInput("C", "C", value = 0.1, min = 0.01, max = 1),
+                 conditionalPanel(
+                   condition = "input.kernelType == 'svmRadial'",
+                   numericInput("sigma_final", "sigma", value = 0.1, min = 0.01, max = 1)
+                 ),
+                 conditionalPanel(
+                   condition = "input.kernelType == 'svmPoly'",
+                   numericInput("degree_final", "degree", value = 2, min = 1, max = 4),
+                 ),
+                 actionButton("train_model", "Train Model")
+               ),
+               mainPanel(
+                 tabsetPanel(
+                   tabPanel("Results",
+                            DT::dataTableOutput("svmFinalModelResults"),
+                   )
+                 )
+               )
+             )
+    )
 
              
     
@@ -262,9 +301,9 @@ ui <- fluidPage(
             testing(test_data)
             
             output$preprocessing_output <- renderText({
-              paste("Data preprocessed and split into training and test sets.\n",
-                    "Training set size:", nrow(train_data),
-                    "\nTest set size:", nrow(test_data))
+              HTML(paste("Data preprocessed and split into training and test sets.<br>",
+                    "Training set size:", nrow(train_data), "<br>",
+                    "Test set size:", nrow(test_data)))
             })
             
           }
@@ -318,7 +357,7 @@ ui <- fluidPage(
       return(p)
       
     } else if (input$plotType == "hist") {
-      req(input$click)  
+      #req(input$click)  
       ggplot(data = File(), aes_string(x = input$var)) +
         geom_histogram(binwidth = diff(range(File()[[input$var]]) / input$bins), fill = input$color, color = "black") +
         labs(x = input$var, y = "Frequency", title = "Histogram") +
@@ -338,29 +377,40 @@ ui <- fluidPage(
   
   modelResults <- eventReactive(input$goButton, {
     # Assuming dataset is loaded and preprocessed already (adjust as needed)
-    print("processing...")
     train_data <- training()
     cost_values <- c() 
+    sigma_start_value <- c()
     if (input$costRange[1] == 0.01){
       start_value = 0.1 
       cost_values <- c(0.01)
     }else{
       start_value = input$costRange[1]
     }
-    values <- seq(from = start_value, to = input$costRange[2], by = 0.2)
-    cost_values <- c(cost_values, values)
+    if (input$sigma[1] == 0.01){
+      sigma_start_value = 0.1 
+      sigma_values <- c(0.01)
+    }else{
+      sigma_start_value = input$costRange[1]
+    }
+    cost_values <- c(cost_values, seq(from = start_value, to = input$costRange[2], by = 0.2))
+    sigma_values <- c(sigma_start_value, seq(from = sigma_start_value, to = input$sigma[2], by = 0.2))
+    #cost_values <- c(cost_values, values)
+    degree_values <- seq(from = input$degree[1], to=input$degree[2], by=1)
     print(cost_values)
-    tuneGrid <- expand.grid(C = cost_values)
-    #tuneGrid <- expand.grid(C = input$cost,
-                            #Gamma = ifelse(input$kernelType != "svmLinear", input$gamma, NA))
+    if (input$kernelType == "svmLinear"){
+      tuneGrid <- expand.grid(C = cost_values)
+    }else if (input$kernelType == "svmPoly"){
+      tuneGrid <- expand.grid(C = cost_values,
+                              degree = degree_values, scale=1)
+    }else if (input$kernelType == "svmRadial"){
+      tuneGrid <- expand.grid(C = cost_values,
+                              sigma = sigma_values)
+    }
     
     trainControl <- trainControl(method = "cv", number = 5, search = "grid", summaryFunction = defaultSummary)
     print("reached here")
     print(nrow(train_data))
-    #train <- na.omit(train)
-    #print(nrow(train))
-    # Train the model
-    #print(sapply(train_data, function(x) sum(is.na(x))))
+    
     svmModel <- train(violentPerPop ~ ., data = train_data, method = input$kernelType,
                       trControl = trainControl, tuneGrid = tuneGrid, metric="RMSE")
     
@@ -393,16 +443,30 @@ ui <- fluidPage(
     }
   })
   
-  train_svm_model <- eventReactive(input$train_model, {
+  train_model <- eventReactive(input$train_model, {
+    train_data <- training()
     resample_final <- trainControl(method = "none") 
+    grid <- data.frame()
+    
+    if (input$kernelType == "svmLinear"){
+      grid = data.frame(C=input$C)
+    }else if (input$kernelType == "svmPoly"){
+      print(input$degree)
+      grid = data.frame(C=input$C, degree=input$degree_final, scale=1)
+    }else if (input$kernelType == "svmRadial"){
+      print(input$sigma)
+      grid = data.frame(C=input$C, sigma=input$sigma_final)
+    }
     svm_model_final <- train(violentPerPop ~ ., data = train_data, trControl = resample_final,
-                             tuneGrid = data.frame(C=input$C), method = input$method, metric="RMSE")
+                             tuneGrid = grid, method = input$kernelType, metric="RMSE")
     
     return(svm_model_final)
   })
   
   output$svmFinalModelResults <- DT::renderDataTable({
-    req(train_svm_model())
+    req(train_model())
+    train_data <- training()
+    test_data <- testing() 
     svm_model_final <- train_model()
     svm_pred_train <- predict(svm_model_final, newdata = train_data)
     svm_pred_test <- predict(svm_model_final, newdata = test_data)
@@ -414,7 +478,8 @@ ui <- fluidPage(
     
     rmse_train <- results_train[1]
     rmse_test <- results_test[1]
-    return(list(results_train=results_train, results_test=results_test))
+    return(data.frame(Dataset = c("Train", "Test"), 
+           RMSE = c(rmse_train, rmse_test)))
     
   })
   
