@@ -7,7 +7,7 @@ library(SuperLearner)
 
 # Loading Data
 
-communities_data <- read.table(file.choose(), header = FALSE, sep = ",")
+communities_data <- read.table(file.choose(), header=FALSE, sep=",", na.strings = "?", stringsAsFactors=TRUE)
 
 extract_column_names <- function(names_file){
   lines <- readLines(names_file)
@@ -25,7 +25,6 @@ head(communities_data)
 # Exploratory Data Analysis
 
 ## Identify missing values
-communities_data[communities_data == "?"] <- NA
 sum(is.na(communities_data))
 sapply(communities_data, function(x) sum(is.na(x)))
 colSums(is.na(communities_data))
@@ -44,12 +43,6 @@ communities_data <- communities_data[complete.cases(communities_data$violentPerP
 ## Drop all rows that are non-predictive 
 communities_data <- communities_data[, !colnames(communities_data) %in% c("communityname",
                                                                           "State", "countyCode", "communityCode")]
-
-## Converting features to numeric
-for (i in c(1:length(colnames(communities_data)))) {
-  var <- colnames(communities_data)[i]
-  communities_data[[var]] <- as.numeric(communities_data[[var]])
-}
 
 ## Identify near-zero variances
 nzv_indices <- nearZeroVar(communities_data)
@@ -324,6 +317,7 @@ ANN_test_results <- postResample(ANN_pred_test, communities_test$violentPerPop)
 cat("RMSE:", ANN_test_results[1], "\nMAE:", ANN_test_results[2], "\n")
 
 ## Stacked Model
+
 
 
 
