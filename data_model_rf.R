@@ -20,6 +20,15 @@ attribute_names = extract_column_names(names_file_path)
 
 colnames(communities_data) <- attribute_names
 
+
+## Transforming skewed target feature
+shifted_variable <- communities_data$violentPerPop - min(communities_data$violentPerPop) + 1  # Adding 1 to avoid zero
+lm_model <- lm(shifted_variable ~ 1)
+boxcox_result <- boxcox(lm_model)
+lambda <- boxcox_result$x[which.max(boxcox_result$y)]
+communities_data$violentPerPop <- if (lambda == 0) log(shifted_variable) else ((shifted_variable^lambda - 1) / lambda)
+hist(communities_data$violentPerPop, main = "Transformed Distribution of violentPerPop")
+
 #create subcategory column groups
 race_cols <- c('pctWhite', 'pctAsian', 'pctBlack', 'pctHisp')
 head(communities_data[race_cols])
@@ -181,12 +190,21 @@ communities_test <- bake(blueprint, new_data = test)
 #install random forest packages
 library(randomForest)
 
+#split train data into input and output 
+x_train <- communities_train[, -1]
+y_train <- communities_train$violentPerPop
+
+x_test <- communities_test[, -1]
+y_test <- communities_test$violentPerPop
+
 # create basic random forest model 
 basic_rf <- randomForest(x_train, y_train)
-#error appears lowest from ~100 tress to ~150
-
+plot(basic_rf)
 #conduct rf model by tuning hyperparameters
 resample <-trainControl(method = "cv", number =5)
+
+print(ncol(communities_test))
+
 #hyperparameter grid
 hyper_grid <- expand.grid(mtry = c(15, 45, 75, 100),
                           splitrule = c("variance", "extratrees"),
@@ -200,7 +218,11 @@ rf_fit <- train(violentPerPop ~.,
                 tuneGrid = hyper_grid,
                 metric = "RMSE",
                 num.trees = 110)
-#rmse is minimized with extra trees model, minimal node size of 7, and 100 randomly selected vars
+
+ggplot(rf_fit)
+
+#rmse is minimized with variance model, minimal node size of 9, and 100 randomly selected vars
+
 
 #fit final model
 
@@ -213,7 +235,7 @@ rf_final <- train(violentPerPop ~ .,
                   metric = "RMSE",
                   tuneGrid = data.frame(mtry = 100,
                                         min.node.size = 9,
-                                        splitrule = "extratrees"),
+                                        splitrule = "variance"),
                   num.trees = 110)
 
 #make final predictions and display accuracy
@@ -225,3 +247,4 @@ rf_pred_test <- predict(rf_final, newdata = communities_test)
 print("Testing Predictions RMSE:")
 test_rmse <- sqrt(mean((communities_test$violentPerPop - rf_pred_test)^2))
 print(test_rmse)
+
