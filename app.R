@@ -90,9 +90,6 @@ ui <- fluidPage(
                    condition = "input.plotType == 'hist'",
                    selectInput("var", "Variable", choices = NULL),
                    numericInput("bins", "Number of bins", min = 1, max = 50, step = 1, value = 10),
-                   radioButtons("color", "Color of bins:",
-                                choices = list("Blue" = "blue", "Red" = "red", "Green" = "green"),
-                                selected = "blue"),
                    #actionButton("click", "Submit")
                  )
                ),
@@ -110,35 +107,45 @@ ui <- fluidPage(
     
     ), 
     tabPanel("Tuning Parameters and Model Optimization",
-             titlePanel("SVM Hyperparameter Tuning"),
+             titlePanel("Hyperparameter Tuning"),
              sidebarLayout(
                sidebarPanel(
-                 selectInput("kernelType", "Kernel Type", choices = c("Linear" = "svmLinear", "Polynomial" = "svmPoly", "RBF" = "svmRadial")),
-                 sliderInput("costRange", "Cost (C) Range",
-                             min = 0.01, max = 1.0, 
-                             value = c(0.01, 0.9),  # Default range selected
-                             step = 0.1,           # Increment step size
-                             ticks = TRUE,         # Shows tick marks
-                             animate = TRUE),
+                 selectInput("modelType", "Select Model Type", choices = c("Random Forest" = "rf", "SVM" = "svm", "XGBoost" = "xgboost")),
                  conditionalPanel(
-                   condition = "input.kernelType == 'svmPoly'",
-                   sliderInput("degree", "degree",
-                               min = 1, max = 4, 
-                               value = c(1, 4),  # Default range selected
-                               step = 1,           # Increment step size
-                               ticks = TRUE,         # Shows tick marks
-                               animate = TRUE),
-                 ),
-                 conditionalPanel(
-                   condition = "input.kernelType == 'svmRadial'",
-                   sliderInput("sigma", "sigma",
+                   condition = "input.modelType == 'svm'",
+                   selectInput("kernelType", "Kernel Type", choices = c("Linear" = "svmLinear", "Polynomial" = "svmPoly", "RBF" = "svmRadial")),
+                   sliderInput("costRange", "Cost (C) Range",
                                min = 0.01, max = 1.0, 
                                value = c(0.01, 0.9),  # Default range selected
                                step = 0.1,           # Increment step size
                                ticks = TRUE,         # Shows tick marks
-                               animate = TRUE)
+                               animate = TRUE),
+                   conditionalPanel(
+                     condition = "input.kernelType == 'svmPoly'",
+                     sliderInput("degree", "degree",
+                                 min = 1, max = 4, 
+                                 value = c(1, 4),  # Default range selected
+                                 step = 1,           # Increment step size
+                                 ticks = TRUE,         # Shows tick marks
+                                 animate = TRUE),
+                   ),
+                   conditionalPanel(
+                     condition = "input.kernelType == 'svmRadial'",
+                     sliderInput("sigma", "sigma",
+                                 min = 0.01, max = 1.0, 
+                                 value = c(0.01, 0.9),  # Default range selected
+                                 step = 0.1,           # Increment step size
+                                 ticks = TRUE,         # Shows tick marks
+                                 animate = TRUE)
+                   ),
+                   actionButton("goButton", "Run Model")
                  ),
-                 actionButton("goButton", "Run Model")
+                 conditionalPanel(
+                   condition = "input.modelType == 'rf'",
+                 ),
+                 conditionalPanel(
+                   condition = "input.modelType == 'xgboost'",
+                 )
                ),
                mainPanel(
                  tabsetPanel(
@@ -222,6 +229,7 @@ ui <- fluidPage(
           if (!is.null(dataset()) && input$dataset != "") {
             tagList(
               br(),
+              selectInput("response_var", "Select Response Variable:", choices = c("violentPerPop", ""), selected="violentPerPop"),
               numericInput("split_ratio", "Training-Test Split Ratio:", value = 0.75, min = 0.1, max = 0.9, step = 0.05),
               checkboxGroupInput("preprocessing_steps", "Select Preprocessing Steps:",
                                  choices = c("Convert to Factors", "Remove Near Zero Variance Predictors",
@@ -234,6 +242,7 @@ ui <- fluidPage(
         
         observeEvent(input$preprocess_button, {
           preprocessing_done(TRUE)
+          print("response variable: ", input$response_var)
           split_ratio <- input$split_ratio
           selected_steps <- input$preprocessing_steps
           print("removed rows with target variable")
@@ -244,6 +253,7 @@ ui <- fluidPage(
           drop_mv_cols <- function(data, threshold){
             missing_cols <- colSums(is.na(data))
             cols_to_drop <- names(missing_cols[missing_cols >= threshold])
+            print("cols_to_drop", paste(cols_to_drop, collapse=", "))
             data <- data[, !(names(data) %in% cols_to_drop)]
           }
           data <- drop_mv_cols(data, threshold=1872)
@@ -357,9 +367,12 @@ ui <- fluidPage(
       return(p)
       
     } else if (input$plotType == "hist") {
-      #req(input$click)  
-      ggplot(data = File(), aes_string(x = input$var)) +
-        geom_histogram(binwidth = diff(range(File()[[input$var]]) / input$bins), fill = input$color, color = "black") +
+      data_for_hist <- File()[!is.na(File()[[input$var]]), ]
+      
+      binwidth <- diff(range(data_for_hist[[input$var]], na.rm = TRUE)) / input$bins
+      binwidth <- ifelse(binwidth > 0, binwidth, 1)
+      ggplot(data = data_for_hist, aes_string(x = input$var)) +
+        geom_histogram(binwidth = binwidth, fill = "blue", color = "black") +
         labs(x = input$var, y = "Frequency", title = "Histogram") +
         theme_minimal()
     }
