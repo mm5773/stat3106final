@@ -229,7 +229,8 @@ ui <- fluidPage(
           if (!is.null(dataset()) && input$dataset != "") {
             tagList(
               br(),
-              selectInput("response_var", "Select Response Variable:", choices = c("violentPerPop", ""), selected="violentPerPop"),
+              selectInput("response_var", "Select Response Variable:", choices = c("violentPerPop", "murders", "murdPerPop", "rapes", "rapesPerPop", 
+                                                                                   "robberies", "assaults", "assaultPerPop", "burglaries"), selected="violentPerPop"),
               numericInput("split_ratio", "Training-Test Split Ratio:", value = 0.75, min = 0.1, max = 0.9, step = 0.05),
               checkboxGroupInput("preprocessing_steps", "Select Preprocessing Steps:",
                                  choices = c("Convert to Factors", "Remove Near Zero Variance Predictors",
@@ -242,32 +243,40 @@ ui <- fluidPage(
         
         observeEvent(input$preprocess_button, {
           preprocessing_done(TRUE)
-          print("response variable: ", input$response_var)
+          cat("response variable: ", input$response_var)
+          #response_variable <- input$response_var
+          formula_text <- paste(input$response_var, "~ .")
+          response_variable <- as.formula(formula_text)
+          print(response_variable)
+          response_variable_name <- all.vars(response_variable)[1]
+          print(response_variable_name)
+          
           split_ratio <- input$split_ratio
           selected_steps <- input$preprocessing_steps
           print("removed rows with target variable")
       
           print(nrow(dataset()))
-          data <- dataset()[complete.cases(dataset()$violentPerPop),]
+          data <- dataset()[complete.cases(dataset()[[response_variable_name]]),]
           
           drop_mv_cols <- function(data, threshold){
             missing_cols <- colSums(is.na(data))
             cols_to_drop <- names(missing_cols[missing_cols >= threshold])
-            print("cols_to_drop", paste(cols_to_drop, collapse=", "))
             data <- data[, !(names(data) %in% cols_to_drop)]
           }
+          
           data <- drop_mv_cols(data, threshold=1872)
           data <- data[, !colnames(data) %in% c("communityname", "State", "countyCode", "communityCode")]
           print(nrow(data))
           
-          shifted_variable <- data$violentPerPop - min(data$violentPerPop) + 1
+          
+          shifted_variable <- data[[response_variable_name]] - min(data[[response_variable_name]]) + 1
           #print(class(shifted_variable))
           #print(shifted_variable)
           lm_model <- lm(shifted_variable ~ 1)
           boxcox_result <- boxcox(lm_model)
           lambda <- boxcox_result$x[which.max(boxcox_result$y)]
           print("reached here hi")
-          data$violentPerPop <- if (lambda == 0) log(shifted_variable) else ((shifted_variable^lambda - 1) / lambda)
+          data[[response_variable_name]] <- if (lambda == 0) log(shifted_variable) else ((shifted_variable^lambda - 1) / lambda)
           
           #split data into training and test
           set.seed(1)
@@ -280,7 +289,7 @@ ui <- fluidPage(
           
           #preprocessing steps 
           if (!is.null(data)) {
-            blueprint <- recipe(violentPerPop ~ ., data = train_data)
+            blueprint <- recipe(response_variable, data = train_data)
             
             if ("Convert to Factors" %in% selected_steps)
               blueprint <- blueprint %>% step_string2factor(all_nominal_predictors())
