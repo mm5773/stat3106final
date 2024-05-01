@@ -5,7 +5,8 @@ library(ggplot2)
 library(tidymodels)
 
 #data loading
-communities_data <- read.table(file.choose(), header = FALSE, sep = ",")
+#NOTE: ADD STRINGSASFACTORS PARAMETER
+communities_data <- read.table(file.choose(), header = FALSE, sep = ",", stringsAsFactors)
 
 #create column names + grouping
 extract_column_names <- function(names_file){
