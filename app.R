@@ -29,7 +29,7 @@ data_initial <- read.csv("~/Downloads/Spring 2024/Applied ML/stat3106final/commu
 
 ui <- fluidPage(
   
-  titlePanel("My First Shiny Application"),
+  titlePanel("STAT3106: Developing Predictive Models"),
   
   navbarPage(
     
@@ -276,13 +276,10 @@ ui <- fluidPage(
           data <- data[, !colnames(data) %in% c("communityname", "State", "countyCode", "communityCode")]
           print(nrow(data))
           
-          
           if ("Box-Cox Transform Response Variable" %in% selected_steps){
             shifted_variable <- data[[response_variable_name()]] - min(data[[response_variable_name()]]) + 1
-            #print(class(shifted_variable))
-            #print(shifted_variable)
-            lm_model <- lm(shifted_variable ~ 1)
-            boxcox_result <- boxcox(lm_model)
+            modeling_data <- data.frame(shifted_variable = shifted_variable)
+            boxcox_result <- boxcox(shifted_variable ~ 1, data = modeling_data)
             lambda <- boxcox_result$x[which.max(boxcox_result$y)]
             data[[response_variable_name()]] <- if (lambda == 0) log(shifted_variable) else ((shifted_variable^lambda - 1) / lambda)
           }
@@ -392,6 +389,7 @@ ui <- fluidPage(
       return(p)
       
     } else if (input$plotType == "hist") {
+      data_for_hist <- File()[!is.na(File()[[input$var]]), ]
       if (input$dataset == "Original"){
         data_for_hist <- File()[!is.na(File()[[input$var]]), ]
       }else if (input$dataset == "Training"){
@@ -457,9 +455,14 @@ ui <- fluidPage(
     #print("reached here")
     #print(nrow(train_data))
     
-    svmModel <- train(response_variable(), data = train_data, method = input$kernelType,
-                      trControl = trainControl, tuneGrid = tuneGrid, metric="RMSE")
-    
+    if (is.null(train_data) || nrow(train_data) == 0) {
+      stop("No training data available. Please provide valid training data to proceed.")
+    } else {
+      svmModel <- train(response_variable(), data = train_data, method = input$kernelType,
+                        trControl = trainControl, tuneGrid = tuneGrid, metric="RMSE")
+
+    }
+  
     print(svmModel)
     return(svmModel)
   })
@@ -471,15 +474,15 @@ ui <- fluidPage(
     if ("results" %in% names(modelResults())) {
       if (input$kernelType == "svmRadial") {
         ggplot(modelResults()$results, aes(x = C, y = sigma, fill = RMSE)) +
-          geom_tile() +  # Tile layer for heat map
+          geom_tile() + 
           scale_fill_gradient(low = "blue", high = "red", name = "RMSE") +
           labs(title = "Radial SVM Performance", x = "Cost (C)", y = "Gamma (sigma)") +
           theme_minimal()
       }else if (input$kernelType == "svmPoly"){
         ggplot(modelResults()$results, aes(x = C, y = degree, fill = RMSE)) +
-          geom_tile() +  # Tile layer for heat map
+          geom_tile() + 
           scale_fill_gradient(low = "blue", high = "red", name = "RMSE") +
-          labs(title = "Radial SVM Performance", x = "Cost (C)", y = "Degree") +
+          labs(title = "Polynomial SVM Performance", x = "Cost (C)", y = "Degree") +
           theme_minimal()
       }else{
         ggplot(modelResults()$results, aes(x = C, y = RMSE)) +
@@ -518,8 +521,12 @@ ui <- fluidPage(
       grid = data.frame(C=input$C, sigma=input$sigma_final)
     }
 
-    svm_model_final <- train(response_variable(), data = train_data, trControl = resample_final,
-                             tuneGrid = grid, method = input$kernelType, metric="RMSE")
+    if (is.null(train_data) || nrow(train_data) == 0) {
+      stop("No training data available. Please provide valid training data to proceed.")
+    } else {
+      svm_model_final <- train(response_variable(), data = train_data, trControl = resample_final,
+                               tuneGrid = grid, method = input$kernelType, metric="RMSE")
+    }
     
     return(svm_model_final)
   })
