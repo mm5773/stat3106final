@@ -390,12 +390,13 @@ ui <- fluidPage(
       
     } else if (input$plotType == "hist") {
       data_for_hist <- File()[!is.na(File()[[input$var]]), ]
-      if (input$dataset == "Original"){
+      print(input$dataset)
+      if (input$dataset_type == "Original"){
         data_for_hist <- File()[!is.na(File()[[input$var]]), ]
-      }else if (input$dataset == "Training"){
+      }else if (input$dataset_type == "Training"){
         data_for_hist <- req(training())
         data_for_hist <- training()[!is.na(training()[[input$var]]), ]
-      }else if (input$dataset == "Testing"){
+      }else if (input$dataset_type == "Testing"){
         data_for_hist <- req(testing())
         data_for_hist <- testing()[!is.na(testing()[[input$var]]), ]
       }
