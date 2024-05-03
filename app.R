@@ -73,6 +73,7 @@ ui <- fluidPage(
              
              sidebarLayout(
                sidebarPanel(
+                 selectInput("dataset_type", "Dataset:", choices=c("Original", "Training", "Testing")),
                  selectInput("plotType", "Choose Plot Type:",
                              choices = c("Scatterplot" = "scatter", "Histogram" = "hist")),
                  
@@ -89,8 +90,7 @@ ui <- fluidPage(
                  conditionalPanel(
                    condition = "input.plotType == 'hist'",
                    selectInput("var", "Variable", choices = NULL),
-                   numericInput("bins", "Number of bins", min = 1, max = 50, step = 1, value = 10),
-                   #actionButton("click", "Submit")
+                   numericInput("bins", "Number of bins", min = 1, max = 50, step = 1, value = 10)
                  )
                ),
                mainPanel(
@@ -99,7 +99,7 @@ ui <- fluidPage(
                             plotOutput("plotOutput")),
                    
                    tabPanel("Numeric Summary",
-                            DT::dataTableOutput("summaryOutput"),
+                            DT::dataTableOutput("summaryOutput")
                    )
                  )
                )
@@ -127,7 +127,7 @@ ui <- fluidPage(
                                  value = c(1, 4),  # Default range selected
                                  step = 1,           # Increment step size
                                  ticks = TRUE,         # Shows tick marks
-                                 animate = TRUE),
+                                 animate = TRUE)
                    ),
                    conditionalPanel(
                      condition = "input.kernelType == 'svmRadial'",
@@ -141,10 +141,10 @@ ui <- fluidPage(
                    actionButton("goButton", "Run Model")
                  ),
                  conditionalPanel(
-                   condition = "input.modelType == 'rf'",
+                   condition = "input.modelType == 'rf'"
                  ),
                  conditionalPanel(
-                   condition = "input.modelType == 'xgboost'",
+                   condition = "input.modelType == 'xgboost'"
                  )
                ),
                mainPanel(
@@ -153,7 +153,7 @@ ui <- fluidPage(
                             plotOutput("plotPerformance")),
                    
                    tabPanel("Numeric Summary",
-                            DT::dataTableOutput("modelResults"),
+                            DT::dataTableOutput("modelResults")
                    )
                  )
                )
@@ -171,14 +171,14 @@ ui <- fluidPage(
                  ),
                  conditionalPanel(
                    condition = "input.kernelType == 'svmPoly'",
-                   numericInput("degree_final", "degree", value = 2, min = 1, max = 4),
+                   numericInput("degree_final", "degree", value = 2, min = 1, max = 4)
                  ),
                  actionButton("train_model", "Train Model")
                ),
                mainPanel(
                  tabsetPanel(
                    tabPanel("Results",
-                            DT::dataTableOutput("svmFinalModelResults"),
+                            DT::dataTableOutput("svmFinalModelResults")
                    )
                  )
                )
@@ -200,6 +200,8 @@ ui <- fluidPage(
     preprocessing_done <- reactiveVal(FALSE)
     training <- reactiveVal()
     testing <- reactiveVal()
+    response_variable_name <- reactiveVal()
+    response_variable <- reactiveVal()
     dataset <- reactive({
       
       if(input$dataset == 'Upload your own file'){
@@ -218,22 +220,28 @@ ui <- fluidPage(
       }
     })
     
-    File <- dataset
+    File <- dataset 
     observeEvent(input$load_data_button, {
       preprocessing_done(FALSE)
       output$data_preview <- DT::renderDataTable({
-        File()
+        dataset()
       })
         
         output$preprocessing_panel <- renderUI({
           if (!is.null(dataset()) && input$dataset != "") {
+            if (input$dataset == "Communities & Crime" || input$dataset != "Upload your own file") {
+              choices <- c("violentPerPop", "murdPerPop", "rapesPerPop", 
+                           "robbPerPop", "assaultPerPop", "burglPerPop", 
+                           "larcPerPop", "autoTheftPerPop", "arsonsPerPop")
+            } else {
+              choices <- names(dataset()[sapply(dataset(), is.numeric)])
+            }
             tagList(
               br(),
-              selectInput("response_var", "Select Response Variable:", choices = c("violentPerPop", "murders", "murdPerPop", "rapes", "rapesPerPop", 
-                                                                                   "robberies", "assaults", "assaultPerPop", "burglaries"), selected="violentPerPop"),
+              selectInput("response_var", "Select Response Variable (numeric):", choices = choices),
               numericInput("split_ratio", "Training-Test Split Ratio:", value = 0.75, min = 0.1, max = 0.9, step = 0.05),
               checkboxGroupInput("preprocessing_steps", "Select Preprocessing Steps:",
-                                 choices = c("Convert to Factors", "Remove Near Zero Variance Predictors",
+                                 choices = c("Box-Cox Transform Response Variable", "Convert to Factors", "Remove Near Zero Variance Predictors",
                                              "Impute Missing Values", "Center Numeric Predictors",
                                              "Scale Numeric Predictors", "Create Dummy Variables")),
               actionButton("preprocess_button", "Preprocess and Split Data")
@@ -244,11 +252,11 @@ ui <- fluidPage(
         observeEvent(input$preprocess_button, {
           preprocessing_done(TRUE)
           cat("response variable: ", input$response_var)
-          #response_variable <- input$response_var
           formula_text <- paste(input$response_var, "~ .")
-          response_variable <- as.formula(formula_text)
-          print(response_variable)
-          response_variable_name <- all.vars(response_variable)[1]
+          response_variable_temp <- as.formula(formula_text)
+          response_variable(as.formula(formula_text))
+          #print(response_variable)
+          response_variable_name(all.vars(response_variable_temp)[1])
           print(response_variable_name)
           
           split_ratio <- input$split_ratio
@@ -256,7 +264,7 @@ ui <- fluidPage(
           print("removed rows with target variable")
       
           print(nrow(dataset()))
-          data <- dataset()[complete.cases(dataset()[[response_variable_name]]),]
+          data <- dataset()[complete.cases(dataset()[[response_variable_name()]]),]
           
           drop_mv_cols <- function(data, threshold){
             missing_cols <- colSums(is.na(data))
@@ -269,14 +277,15 @@ ui <- fluidPage(
           print(nrow(data))
           
           
-          shifted_variable <- data[[response_variable_name]] - min(data[[response_variable_name]]) + 1
-          #print(class(shifted_variable))
-          #print(shifted_variable)
-          lm_model <- lm(shifted_variable ~ 1)
-          boxcox_result <- boxcox(lm_model)
-          lambda <- boxcox_result$x[which.max(boxcox_result$y)]
-          print("reached here hi")
-          data[[response_variable_name]] <- if (lambda == 0) log(shifted_variable) else ((shifted_variable^lambda - 1) / lambda)
+          if ("Box-Cox Transform Response Variable" %in% selected_steps){
+            shifted_variable <- data[[response_variable_name()]] - min(data[[response_variable_name()]]) + 1
+            #print(class(shifted_variable))
+            #print(shifted_variable)
+            lm_model <- lm(shifted_variable ~ 1)
+            boxcox_result <- boxcox(lm_model)
+            lambda <- boxcox_result$x[which.max(boxcox_result$y)]
+            data[[response_variable_name()]] <- if (lambda == 0) log(shifted_variable) else ((shifted_variable^lambda - 1) / lambda)
+          }
           
           #split data into training and test
           set.seed(1)
@@ -289,7 +298,7 @@ ui <- fluidPage(
           
           #preprocessing steps 
           if (!is.null(data)) {
-            blueprint <- recipe(response_variable, data = train_data)
+            blueprint <- recipe(response_variable(), data = train_data)
             
             if ("Convert to Factors" %in% selected_steps)
               blueprint <- blueprint %>% step_string2factor(all_nominal_predictors())
@@ -320,8 +329,8 @@ ui <- fluidPage(
             testing(test_data)
             
             output$preprocessing_output <- renderText({
-              HTML(paste("Data preprocessed and split into training and test sets.<br>",
-                    "Training set size:", nrow(train_data), "<br>",
+              HTML(paste("Data preprocessed and split into training and test sets.", 
+                    "Training set size:", nrow(train_data),
                     "Test set size:", nrow(test_data)))
             })
             
@@ -336,36 +345,43 @@ ui <- fluidPage(
     })
   
   ##
-  
-  observeEvent(File(), {
-    
-    updateSelectInput(session, "response",
-                      
-                      choices = names(File()))
-  })
-  
-  
-  
-  observeEvent(File(), {
-    
-    updateSelectInput(session, "explanatory",
-                      
-                      choices = names(File()))
-  }) 
-  
-  
-  observeEvent(File(), {
-    
-    updateSelectInput(session, "var",
-                      
-                      choices = names(File()))
-  })
+    observeEvent(dataset(), {
+      print("goes here")
+      if (input$dataset == "Communities & Crime" || input$dataset != "Upload your own file"){
+        print("here")
+        columns_to_exclude <- c("communityname", "State", "countyCode", "communityCode")
+        available_choices <- setdiff(names(File()), columns_to_exclude)
+        
+        updateSelectInput(session, "response", choices = available_choices, selected="violentPerPop")
+        updateSelectInput(session, "explanatory", choices = available_choices, selected="pctBlack")
+        updateSelectInput(session, "var", choices = available_choices, selected = "violentPerPop")
+      }else{
+        updateSelectInput(session, "explanatory", choices = names(File()))
+        updateSelectInput(session, "response", choices = names(File()))
+        updateSelectInput(session, "var", choices = names(File()))
+      }
+    })
+
   
   ##
-  
   output$plotOutput <- renderPlot({
     if (input$plotType == "scatter") {
-      p <- ggplot(data = File(), aes_string(x = input$explanatory, y = input$response)) +
+      print(input$dataset)
+      data_for_plot <- dataset()
+      if (input$dataset_type == "Original"){
+        data_for_plot <- dataset()
+      }else if (input$dataset_type == "Training"){
+        cat("training", input$dataset)
+        data_for_plot <- req(training())
+        data_for_plot <- training()
+      }else if (input$dataset_type == "Testing"){
+        cat("testing", input$dataset)
+        data_for_plot <- req(testing())
+        data_for_plot <- testing()
+      }
+      
+      print("structure of data", str(data_for_plot))
+      p <- ggplot(data = data_for_plot, aes_string(x = input$explanatory, y = input$response)) +
         geom_point(alpha = input$shade) +
         theme_minimal()
    
@@ -376,7 +392,15 @@ ui <- fluidPage(
       return(p)
       
     } else if (input$plotType == "hist") {
-      data_for_hist <- File()[!is.na(File()[[input$var]]), ]
+      if (input$dataset == "Original"){
+        data_for_hist <- File()[!is.na(File()[[input$var]]), ]
+      }else if (input$dataset == "Training"){
+        data_for_hist <- req(training())
+        data_for_hist <- training()[!is.na(training()[[input$var]]), ]
+      }else if (input$dataset == "Testing"){
+        data_for_hist <- req(testing())
+        data_for_hist <- testing()[!is.na(testing()[[input$var]]), ]
+      }
       
       binwidth <- diff(range(data_for_hist[[input$var]], na.rm = TRUE)) / input$bins
       binwidth <- ifelse(binwidth > 0, binwidth, 1)
@@ -430,10 +454,10 @@ ui <- fluidPage(
     }
     
     trainControl <- trainControl(method = "cv", number = 5, search = "grid", summaryFunction = defaultSummary)
-    print("reached here")
-    print(nrow(train_data))
+    #print("reached here")
+    #print(nrow(train_data))
     
-    svmModel <- train(violentPerPop ~ ., data = train_data, method = input$kernelType,
+    svmModel <- train(response_variable(), data = train_data, method = input$kernelType,
                       trControl = trainControl, tuneGrid = tuneGrid, metric="RMSE")
     
     print(svmModel)
@@ -445,11 +469,25 @@ ui <- fluidPage(
     req(modelResults())
     # Plotting the results
     if ("results" %in% names(modelResults())) {
-      ggplot(modelResults()$results, aes(x = C, y = RMSE)) +
-        geom_line() +
-        geom_point() +
-        theme_minimal() +
-        labs(title = "Model Performance", x = "Cost (C)", y = "RMSE")
+      if (input$kernelType == "svmRadial") {
+        ggplot(modelResults()$results, aes(x = C, y = sigma, fill = RMSE)) +
+          geom_tile() +  # Tile layer for heat map
+          scale_fill_gradient(low = "blue", high = "red", name = "RMSE") +
+          labs(title = "Radial SVM Performance", x = "Cost (C)", y = "Gamma (sigma)") +
+          theme_minimal()
+      }else if (input$kernelType == "svmPoly"){
+        ggplot(modelResults()$results, aes(x = C, y = degree, fill = RMSE)) +
+          geom_tile() +  # Tile layer for heat map
+          scale_fill_gradient(low = "blue", high = "red", name = "RMSE") +
+          labs(title = "Radial SVM Performance", x = "Cost (C)", y = "Degree") +
+          theme_minimal()
+      }else{
+        ggplot(modelResults()$results, aes(x = C, y = RMSE)) +
+          geom_line() +
+          geom_point() +
+          theme_minimal() +
+          labs(title = "Model Performance", x = "Cost (C)", y = "RMSE")
+      }
     } else {
       print("No results available for plotting")
     }
@@ -479,7 +517,8 @@ ui <- fluidPage(
       print(input$sigma)
       grid = data.frame(C=input$C, sigma=input$sigma_final)
     }
-    svm_model_final <- train(violentPerPop ~ ., data = train_data, trControl = resample_final,
+
+    svm_model_final <- train(response_variable(), data = train_data, trControl = resample_final,
                              tuneGrid = grid, method = input$kernelType, metric="RMSE")
     
     return(svm_model_final)
@@ -493,8 +532,8 @@ ui <- fluidPage(
     svm_pred_train <- predict(svm_model_final, newdata = train_data)
     svm_pred_test <- predict(svm_model_final, newdata = test_data)
     
-    results_train <- postResample(pred = svm_pred_train, obs = train_data$violentPerPop)
-    results_test <- postResample(pred = svm_pred_test, obs = test_data$violentPerPop)
+    results_train <- postResample(pred = svm_pred_train, obs = train_data[[response_variable_name()]])
+    results_test <- postResample(pred = svm_pred_test, obs = test_data[[response_variable_name()]])
     print(results_train)
     print(results_test)
     
