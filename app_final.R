@@ -53,7 +53,7 @@ ui <- fluidPage(
                         "4. Enter the preferred Training-Testing data split ratio. The default is 75-25. <br/> <br/>",
                         "5. Select the relevant pre-processing steps based on your exploratory data analysis and click Preprocess and Split Data. Wait until a message appears confirming that the data has been split and pre-processed. <br/> <br/>",
                         "6. In the Data Visualization tab, visualize and access summaries of variables for each of the Original, Training and Testing Datasets to confirm distribution. <br/> <br/>",
-                        "7. In the Tuning Paramterers and Model Optimization tab, select a Model Type and corresponding hyperparamatere values, then click Run Model and wait until Plot and Numeric Summary tabs populate with model results. <br/> <br/>",
+                        "7. In the Tuning Paramterers and Model Optimization tab, select a Model Type and corresponding hyperparameter values, then click Run Model and wait until Plot and Numeric Summary tabs populate with model results. <br/> <br/>",
                         "8. In the Developing Final Model tab, enter optimized parameter values based on the results of the tuning process and click Train Model to obtain evaluation metrics for the Training and Testing Datasets."
                         )
                )
