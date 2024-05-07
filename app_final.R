@@ -24,7 +24,7 @@ library(caret)
 library(MASS)
 
 #read in communities_data_final.txt
-data_initial <- read.csv("C:/Users/suram/OneDrive/STAT UN3106 Applied Machine Learning/Final Project/stat3106final/communities_data_final.txt", header = TRUE)
+data_initial <- read.csv(file.choose(), header = TRUE)
 
 # Define UI for application
 
