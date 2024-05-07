@@ -450,12 +450,12 @@ xgb_train_results <- postResample(xgb_pred_train, communities_train$violentPerPo
 cat("RMSE:", xgb_train_results[1], "\nMAE:", xgb_train_results[2], "\n")
 
 xgb_pred_test <- predict(XGB_Final, newdata = communities_test)
-XGB_test_results <- postResample(XGB_pred_test, communities_test$violentPerPop)
+XGB_test_results <- postResample(xgb_pred_test, communities_test$violentPerPop)
 cat("RMSE:", XGB_test_results[1], "\nMAE:", XGB_test_results[2], "\n")
 ```
 
 ```{r}
-#(8) Artifical Neural Networks Model 
+#(8) Artificial Neural Networks Model 
 
 #(8.A) Create Basic ANN Model Grid
 ANN_Grid <- expand.grid(layer1 = c(25, 45),
