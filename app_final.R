@@ -886,7 +886,3 @@ ui <- fluidPage(
 # Run the application 
 
 shinyApp(ui = ui, server = server)
-
-# Deploying the web app
-
-rsconnect::deployApp('C:/Users/suram/OneDrive/STAT UN3106 Applied Machine Learning/Final Project/stat3106final/Final Project App')
