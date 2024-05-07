@@ -9,6 +9,12 @@ library(shinycssloaders)
 
 library(randomForest)
 
+library(ranger)
+
+library(xgboost)
+
+library(kernlab)
+
 library(tidymodels)
 
 library(tidyverse)
@@ -23,8 +29,8 @@ library(caret)
 
 library(MASS)
 
-#read in communities_data_final.txt
-data_initial <- read.csv(file.choose(), header = TRUE)
+# read in communities_data_final.txt
+data_initial <- read.csv("data/communities_data_final.txt", header = TRUE)
 
 # Define UI for application
 
@@ -877,9 +883,10 @@ ui <- fluidPage(
 }
 
 
-
-
-
 # Run the application 
 
 shinyApp(ui = ui, server = server)
+
+# Deploying the web app
+
+rsconnect::deployApp('C:/Users/suram/OneDrive/STAT UN3106 Applied Machine Learning/Final Project/stat3106final/Final Project App')
